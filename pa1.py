@@ -1,4 +1,12 @@
-import operator
+"""
+Many Time Pad
+
+Let us see what goes wrong when a stream cipher key is used more than once. Below are eleven hex-encoded ciphertexts
+that are the result of encrypting eleven plaintexts with a stream cipher, all with the same stream cipher key. Your goal
+is to decrypt the last ciphertext, and submit the secret message within it as solution.
+
+Hint: XOR the ciphertexts together, and consider what happens when a space is XORed with a character in [a-zA-Z].
+"""
 
 # Input sample of ten cipher texts encoded in hex format.
 encoded_ciphertexts = [
@@ -24,12 +32,17 @@ target_text = ''
 # All sample texts are longer than target text.
 for i in range(0, len(target_ciphertext)):
 
-    # For each sample cipher text, count of instances when character at position i is thought to be a space.
-    space_rating = {}
+    # Index of character within sample cipher text with that has maximum chance of being a space.
+    x_max = 0;
+
+    # Count of instances when the character is suspected to be a space.
+    space_count_max = 0;
+
 
     for x in range(0, len(ciphertexts)):
 
-        space_rating[x] = 0
+        space_count = 0
+
         for y in range(0, len(ciphertexts)):
 
             if x == y: pass
@@ -40,14 +53,15 @@ for i in range(0, len(target_ciphertext)):
             # Summing a space character with an alphabet with result in character with ASCII value greater than 0x40.
             # Summing any two alphabets will never yield a value greater than 0x40;
             if modulo_sum > 0x40 or modulo_sum == 0x00:
-                space_rating[x] += 1
+                space_count += 1
 
-    # Index of sample cipher text with that has maximum chance of having space character.
-    si = max(space_rating.iteritems(), key=operator.itemgetter(1))[0]
+        if space_count_max < space_count:
+            space_count_max = space_count
+            x_max = x
 
     # Modulo-2 sum the suspected space character with ASCII value of space to get the encryption key character.
     # Modulo-2 sum the encryption key with target cipher text character to get the approximate original text.
-    target_text += chr(ord(target_ciphertext[i]) ^ ord(ciphertexts[si][i]) ^ 0x20)
+    target_text += chr(ord(target_ciphertext[i]) ^ ord(ciphertexts[x_max][i]) ^ 0x20)
 
 # Output the approximate original text.
 print target_text
