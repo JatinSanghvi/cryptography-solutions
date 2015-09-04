@@ -33,22 +33,21 @@ target_text = ''
 for i in range(0, len(target_ciphertext)):
 
     # Index of character within sample cipher text with that has maximum chance of being a space.
-    x_max = 0;
+    x_max = 0
 
     # Count of instances when the character is suspected to be a space.
-    space_count_max = 0;
-
+    space_count_max = 0
 
     for x in range(0, len(ciphertexts)):
 
         space_count = 0
-
         for y in range(0, len(ciphertexts)):
 
-            if x == y: pass
+            if x == y:
+                pass
 
             # Compute modulo-2 sum of characters at position i for every pair of sample cipher texts.
-            modulo_sum = ord(ciphertexts[x][i]) ^ ord(ciphertexts[y][i]);
+            modulo_sum = ord(ciphertexts[x][i]) ^ ord(ciphertexts[y][i])
 
             # Summing a space character with an alphabet with result in character with ASCII value greater than 0x40.
             # Summing any two alphabets will never yield a value greater than 0x40;
