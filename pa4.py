@@ -42,7 +42,9 @@ import Queue
 import threading
 import urllib2
 
-block_size = 32
+block_size, byte_size = 32, 2  # length of hexadecimal strings to represent a block and a byte
+
+# All padding combinations employed in PKCS #5 padding scheme.
 paddings = ['00000000000000000000000000000001',
             '00000000000000000000000000000202',
             '00000000000000000000000000030303',
@@ -61,14 +63,19 @@ paddings = ['00000000000000000000000000000001',
             '10101010101010101010101010101010']
 
 
+# Returns exclusive-OR of three blocks represented in hexadecimal format.
 def xor_block(hex_num1, hex_num2, hex_num3):
     return format(int(hex_num1, 16) ^ int(hex_num2, 16) ^ int(hex_num3, 16), '032x')
 
 
+# Replaces a byte in block represented in hexadecimal format.
 def replace_block(block, hex_byte, byte_position):
-    return block[:(block_size - byte_position * 2 - 2)] + hex_byte + block[(block_size - byte_position * 2):block_size]
+    return block[:(block_size - (byte_position + 1) * byte_size)] + hex_byte +\
+        block[(block_size - byte_position * byte_size):block_size]
 
 
+# Facilitates sending multiple HTTP requests in parallel.
+# Tries to open input 'url'. Puts 'result_val' into 'result_queue' if either HTTP request succeeds or returns error 404.
 class Requestor(threading.Thread):
     def __init__(self, result_val, url, result_queue):
         threading.Thread.__init__(self)
@@ -85,7 +92,12 @@ class Requestor(threading.Thread):
         self.result_queue.put(self.result_val)
 
 
-def decrypt_byte(ciphertext_block, message_block, byte_position):
+# Retrieves one byte of the message in each run. The function is called recursively to resolve situations when
+# multiple guesses yield success.
+def decrypt_block_bytewise(ciphertext_block, message_block, byte_position):
+    if byte_position == block_size / byte_size:
+        return message_block
+
     target = 'http://crypto-class.appspot.com/po?er='
     threads = []
     result_queue = Queue.Queue()
@@ -100,28 +112,26 @@ def decrypt_byte(ciphertext_block, message_block, byte_position):
     for t in threads:
         t.join()
 
-    # In rare situations, two guesses can result in HTTP error 404. For example, the message block ending with 02?? will
-    # result in 404 for both values 01 and 02 of the last bit.
-    result = 0
+    # In rare situations, two guesses can result in HTTP error 404. For example, the message block ending with
+    # 030302 will result in 404 for both values 01 and 03 of the last bit. Hence call the function recursively
+    # for new byte position for all successful results of current byte position.
     while not result_queue.empty():
-        result = max(result, result_queue.get())
-    return format(result, '02x')
+        new_message_block = replace_block(message_block, format(result_queue.get(), '02x'), byte_position)
+        decrypted_message_block = decrypt_block_bytewise(ciphertext_block, new_message_block, byte_position + 1)
+        if decrypted_message_block is not None:
+            return decrypted_message_block
 
 
+# Decrypts that (IV + ciphertext) block of 256 bits into 128 bit message block.
 def decrypt_block(ciphertext_block):
-    message_block = '0' * block_size
-    for byte_position in range(16):
-        hex_byte = decrypt_byte(ciphertext_block, message_block, byte_position)
-        message_block = replace_block(message_block, hex_byte, byte_position)
-    return message_block
+    return decrypt_block_bytewise(ciphertext_block, '0' * block_size, 0)
 
 
+# Decrypts the CBC encrypted message.
 def decrypt_message(ciphertext):
     message_blocks = len(ciphertext) / block_size - 1
-    message = ''
-    for block_num in range(message_blocks):
-        message += decrypt_block(ciphertext[block_num * block_size:(block_num + 2) * block_size])
-    return message
+    return ''.join([decrypt_block(ciphertext[block_num * block_size:(block_num + 2) * block_size])
+                    for block_num in range(message_blocks)])
 
 
 def main():
