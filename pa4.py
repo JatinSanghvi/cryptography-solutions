@@ -98,6 +98,8 @@ def decrypt_block_bytewise(ciphertext_block, message_block, byte_position):
     if byte_position == block_size / byte_size:
         return message_block
 
+    # To save time, create a thread for each of the guesses for a particular byte position.
+    # Pass the URL path that the thread should query and the guess that it should return on success.
     target = 'http://crypto-class.appspot.com/po?er='
     threads = []
     result_queue = Queue.Queue()
@@ -106,15 +108,13 @@ def decrypt_block_bytewise(ciphertext_block, message_block, byte_position):
                           paddings[byte_position]) + ciphertext_block[32:]
         threads.append(Requestor(guess, target + query, result_queue))
 
-    for t in threads:
-        t.start()
-
-    for t in threads:
-        t.join()
+    # Start all threads in parallel and wait for them to finish.
+    map(lambda t: t.start(), threads)
+    map(lambda t: t.join(), threads)
 
     # In rare situations, two guesses can result in HTTP error 404. For example, the message block ending with
     # 030302 will result in 404 for both values 01 and 03 of the last bit. Hence call the function recursively
-    # for new byte position for all successful results of current byte position.
+    # for next byte position for all successful results of current byte position.
     while not result_queue.empty():
         new_message_block = replace_block(message_block, format(result_queue.get(), '02x'), byte_position)
         decrypted_message_block = decrypt_block_bytewise(ciphertext_block, new_message_block, byte_position + 1)
